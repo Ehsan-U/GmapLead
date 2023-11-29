@@ -93,7 +93,7 @@ class Spider():
         logger.info("Getting places")
 
         places = Selector(response.text).xpath("//a[contains(@href, '/maps/place')]/@href").getall()
-        reqs = [self.session.async_get(place) for place in places]
+        reqs = [self.session.async_get(place, timeout=10) for place in places]
         resps = hrequests.map(
             reqs, 
             size=self.concurrent_requests, 
