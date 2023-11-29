@@ -1,5 +1,6 @@
 
 import json
+from models import Place
 
 
 
@@ -65,21 +66,21 @@ def parse(response):
         place_timezone = safe_get(data, 6, 30)
         place_gmap_link = response.url
 
-        return {
-            'place_id': place_id,
-            'place_name': place_name,
-            'place_desc': place_desc,
-            'place_reviews': place_reviews,
-            'place_website': place_website,
-            'place_owner': place_owner,
-            'place_main_category': place_main_category,
-            'place_categories': place_categories,
-            'place_rating': place_rating,
-            'place_phone': place_phone,
-            'place_address': place_address,
-            'place_detailed_address': place_detailed_address,
-            'place_timezone': place_timezone,
-            'place_gmap_link': place_gmap_link
-        }
+        return Place(
+            place_id=place_id,
+            place_name=place_name,
+            place_desc=place_desc,
+            place_reviews=place_reviews,
+            place_website=place_website,
+            place_owner=place_owner,
+            place_main_category=place_main_category,
+            place_categories=place_categories,
+            place_rating=place_rating,
+            place_phone=place_phone,
+            place_address=place_address,
+            place_detailed_address=place_detailed_address,
+            place_timezone=place_timezone,
+            place_gmap_link=place_gmap_link
+        )
 
 
