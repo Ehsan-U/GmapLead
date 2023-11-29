@@ -97,7 +97,7 @@ class Spider():
         resps = hrequests.map(
             reqs, 
             size=self.concurrent_requests, 
-            timeout=60, 
+            timeout=120, 
             exception_handler=self.err_handler
         )
         return [parse(resp) for resp in resps]
