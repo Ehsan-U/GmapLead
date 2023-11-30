@@ -4,3 +4,4 @@
 test.py
 *.pyc
 .env
+*.csv
