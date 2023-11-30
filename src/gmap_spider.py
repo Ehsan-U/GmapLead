@@ -3,6 +3,7 @@ import time
 from urllib.parse import quote_plus, urlparse, parse_qs
 import random
 import hrequests
+from requests.exceptions import HTTPError
 from src.gmap_parser import parse
 from typing import Dict, List, Optional, Tuple
 from dotenv import load_dotenv
@@ -108,7 +109,8 @@ class Spider():
 
         try:
             response = self.session.get(next_xhr_url)
-            response.raise_for_status()
+            if response.status_code != 200:
+                raise HTTPError
         except Exception as e:
             logger.error(f"Error occurred while fetching: {next_xhr_url}\n {e}")
             return None, None
@@ -150,6 +152,4 @@ class Spider():
         return _output
 
 
-s = Spider()
-s.crawl("developers in Bangalore")
 
