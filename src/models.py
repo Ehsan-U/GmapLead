@@ -5,6 +5,7 @@ from dataclasses import dataclass
 @dataclass
 class Response:
     status: int
+    url: str
     text: str
 
 
