@@ -8,6 +8,7 @@ from src.gmap_parser import parse
 from typing import Dict, List, Optional, Tuple
 from dotenv import load_dotenv
 import os
+from dataclasses import asdict
 
 load_dotenv(dotenv_path='../.env')
 from src.models import Response
@@ -150,7 +151,7 @@ class Spider():
             self.places_count += 20
             response, next_xhr_url = self.paginate(next_xhr_url)
 
-        return _output
+        return [asdict(place) for place in _output]
 
 
 
