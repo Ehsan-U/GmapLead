@@ -32,13 +32,13 @@ class Spider():
     - crawl(query: str, max_results=20) -> List[Dict]: Crawls Google Maps search results for a given query.
     """
     map_url = "https://www.google.com/maps/search/{}"
-    proxy = os.getenv("PROXY")
 
 
-    def __init__(self):
+    def __init__(self, proxy: str = None):
         """
         Initializes the Spider object.
         """
+        self.proxy = proxy if proxy else os.getenv("PROXY")
         self.xhr_url = []
         self.session = hrequests.Session(
             browser=random.choice(['chrome', 'firefox']),
