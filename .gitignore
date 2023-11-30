@@ -3,3 +3,4 @@
 *.txt
 test.py
 *.pyc
+.env
