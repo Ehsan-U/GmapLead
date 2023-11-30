@@ -105,7 +105,7 @@ class Spider():
         Returns:
         - Optional[Tuple[Response, str]]: A tuple containing the response and the URL for the next page of search results.
         """
-        logger.info(f"Page {self.places_count / 20}")
+        logger.info(f"Page {round(self.places_count / 20)}")
 
         try:
             response = self.session.get(next_xhr_url)
@@ -146,6 +146,7 @@ class Spider():
             places = parse(response)
             if not places:
                 break
+            _output.extend(places)
             self.places_count += 20
             response, next_xhr_url = self.paginate(next_xhr_url)
 
