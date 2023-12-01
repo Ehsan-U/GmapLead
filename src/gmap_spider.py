@@ -1,9 +1,9 @@
+from base64 import b64decode
 import json
-import time
 from urllib.parse import quote_plus, urlparse, parse_qs
-import random
-import hrequests
-from requests.exceptions import HTTPError
+from httpx import Client, HTTPError
+from playwright_stealth import stealth_sync
+from playwright.sync_api import sync_playwright
 from src.gmap_parser import parse
 from typing import Dict, List, Optional, Tuple
 from dotenv import load_dotenv
@@ -31,28 +31,21 @@ class Spider():
     - paginate(next_xhr_url: str) -> Optional[Tuple[Response, str]]: Fetches the next page of search results.
     - crawl(query: str, max_results=20) -> List[Dict]: Crawls Google Maps search results for a given query.
     """
-    map_url = "https://www.google.com/maps/search/{}"
+    MAP_URL = "https://www.google.com/maps/search/{}"
+    ZYTE_ENDPOINT = os.getenv("ZYTE_ENDPOINT")
+    ZYTE_API_KEY = os.getenv("ZYTE_API_KEY")
 
 
-    def __init__(self, proxy: str = None):
+    def __init__(self, proxy: bool = False):
         """
         Initializes the Spider object.
         """
-        self.proxy = proxy if proxy else os.getenv("PROXY")
+        self.proxy = proxy
         self.xhr_url = []
-        self.session = hrequests.Session(
-            browser=random.choice(['chrome', 'firefox']),
-            os=random.choice(['win', 'lin', 'mac']),
-            proxies={
-                "http": self.proxy, 
-                "https": self.proxy
-            } 
-            if self.proxy else None
-        )
         self.places_count = 0
 
 
-    async def handle_request(self, route):
+    def handle_request(self, route):
         """
         Handles the intercepted requests during crawling.
 
@@ -62,7 +55,7 @@ class Spider():
         request = route.request
         if 'search?tbm=map' in request.url:
             self.xhr_url.append(request.url)
-        await route.continue_()
+        route.continue_()
 
 
     def search(self, query: str) -> Optional[Tuple]:
@@ -77,21 +70,24 @@ class Spider():
         """
         logger.info(f"Searching: {query}")
 
-        url = self.map_url.format(quote_plus(query))
+        url = self.MAP_URL.format(quote_plus(query))
         self.source = url
 
-        with self.session.render(url=url, mock_human=True, headless=True) as page:
-            browser = page.page
+        with sync_playwright() as p:
+            browser = p.firefox.launch(headless=True).new_context()
+            page = browser.new_page()
+            stealth_sync(page)
 
-            page._call_wrapper(browser.route, "**/*", self.handle_request)
-            page._call_wrapper(browser.focus, "//h1[text()='Results']/ancestor::div[contains(@aria-label, 'Results for')]")
+            page.route("**/*", self.handle_request)
+            page.goto(url)
+            page.focus, "//h1[text()='Results']/ancestor::div[contains(@aria-label, 'Results for')]"
 
             while True:
-                time.sleep(2)
-                last_element = browser.locator("//a[contains(@href, '/maps/place')]").last
-                page._call_wrapper(last_element.scroll_into_view_if_needed)
+                page.wait_for_timeout(2000)
+                last_element = page.locator("//a[contains(@href, '/maps/place')]").last
+                last_element.scroll_into_view_if_needed()
                 if self.xhr_url:
-                    return Response(status=200, url=self.source, text=page.content), self.xhr_url.pop()
+                    return Response(status=200, url=self.source, text=page.content()), self.xhr_url.pop()
                 
         return None, None
 
@@ -109,24 +105,41 @@ class Spider():
         logger.info(f"Page {round(self.places_count / 20)}")
 
         try:
-            response = self.session.get(next_xhr_url)
+            with Client() as client:
+                if self.proxy and self.ZYTE_ENDPOINT and self.ZYTE_API_KEY:
+                    response = client.post(
+                        self.ZYTE_ENDPOINT,
+                        auth=(self.ZYTE_API_KEY, ""),
+                        json={
+                            "url": next_xhr_url,
+                            "httpResponseBody": True,
+                            "httpRequestMethod": "GET"
+                        },
+                    )
+                    http_response_body = b64decode(response.json()["httpResponseBody"]).decode()
+                else:
+                    response = client.get(next_xhr_url)
+                    http_response_body = response.text
             if response.status_code != 200:
                 raise HTTPError
         except Exception as e:
             logger.error(f"Error occurred while fetching: {next_xhr_url}\n {e}")
             return None, None
+        
+        if '/*""*/' in http_response_body:
+            json_obj = json.loads(http_response_body.strip('/*""*/'))
 
-        json_obj = json.loads(response.text.strip('/*""*/'))
+            current_page_value = self.places_count
+            next_page_value = self.places_count + 20
 
-        current_page_value = self.places_count
-        next_page_value = self.places_count + 20
+            # 8i20 8i40 8i60
+            next_page_url = json_obj['u'].replace(f"8i{current_page_value}", f"8i{next_page_value}")
+            ech = int(parse_qs(urlparse(next_page_url).query)['ech'][0])
+            next_page_url = next_page_url.replace(f"ech={ech}", f"ech={ech + 1}")
 
-        # 8i20 8i40 8i60
-        next_page_url = json_obj['u'].replace(f"8i{current_page_value}", f"8i{next_page_value}")
-        ech = int(parse_qs(urlparse(next_page_url).query)['ech'][0])
-        next_page_url = next_page_url.replace(f"ech={ech}", f"ech={ech + 1}")
-
-        return Response(status=200, url=self.source, text=json_obj['d']), next_page_url
+            return Response(status=200, url=self.source, text=json_obj['d']), next_page_url
+        else:
+            return Response(status=404, url=self.source, text=None), None
         
 
     def crawl(self, query: str, max_results=20) -> List[Dict]:
@@ -143,7 +156,7 @@ class Spider():
         _output = []
         response, next_xhr_url = self.search(query)
 
-        while len(_output) < max_results:
+        while (len(_output) < max_results) or (next_xhr_url is not None):
             places = parse(response)
             if not places:
                 break
