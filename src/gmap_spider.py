@@ -102,7 +102,6 @@ class Spider():
         Returns:
         - Optional[Tuple[Response, str]]: A tuple containing the response and the URL for the next page of search results.
         """
-        logger.info(f"Page {round(self.places_count / 20)}")
 
         try:
             with Client() as client:
@@ -142,7 +141,7 @@ class Spider():
             return Response(status=404, url=self.source, text=None), None
         
 
-    def crawl(self, query: str, max_results=20) -> List[Dict]:
+    def crawl(self, query: str, max_results: int = 20) -> List[Dict]:
         """
         Crawls Google Maps search results for a given query.
 
@@ -156,13 +155,16 @@ class Spider():
         _output = []
         response, next_xhr_url = self.search(query)
 
-        while (len(_output) < max_results) or (next_xhr_url is not None):
+        while (len(_output) < max_results):
             places = parse(response)
             if not places:
                 break
             _output.extend(places)
             self.places_count += 20
             response, next_xhr_url = self.paginate(next_xhr_url)
+            if next_xhr_url is None:
+                break
+            logger.info(f"Total places: {len(_output)}, Page: {round(self.places_count / 20)}")
 
         return [asdict(place) for place in _output]
 
