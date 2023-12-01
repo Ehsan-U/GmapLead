@@ -11,12 +11,10 @@ from dotenv import load_dotenv
 import os
 from aiolimiter import AsyncLimiter
 from dataclasses import asdict
-import logging
 
 load_dotenv(dotenv_path='../.env')
 from src.utils import Response, get_rating_enum
 from src.logger import logger
-logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 class Spider():
