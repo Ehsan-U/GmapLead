@@ -1,10 +1,9 @@
 from src.gmap_spider import Spider
 import pandas as pd
+import asyncio
 
 
 s = Spider(proxy=True)
-places = s.crawl("developers in Bangalore", max_results=150)
+places = asyncio.run(s.crawl("developers in Bangalore", max_results=100))
 
 
-df = pd.DataFrame(places)
-df.to_csv('places.csv', index=False)

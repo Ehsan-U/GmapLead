@@ -1,13 +1,15 @@
+import asyncio
 from base64 import b64decode
 import json
 from urllib.parse import quote_plus, urlparse, parse_qs
-from httpx import Client, HTTPError
-from playwright_stealth import stealth_sync
-from playwright.sync_api import sync_playwright
+from httpx import AsyncClient, HTTPError
+from playwright_stealth import stealth_async
+from playwright.async_api import async_playwright
 from src.gmap_parser import parse
 from typing import Dict, List, Optional, Tuple
 from dotenv import load_dotenv
 import os
+import random
 from dataclasses import asdict
 
 load_dotenv(dotenv_path='../.env')
@@ -19,18 +21,8 @@ from src.logger import logger
 class Spider():
     """
     Spider class for crawling Google Maps search results.
-
-    Attributes:
-    - map_url (str): The base URL for Google Maps search.
-    - proxy (str): The proxy server to be used for requests.
-
-    Methods:
-    - __init__(): Initializes the Spider object.
-    - handle_request(route): Handles the intercepted requests during crawling.
-    - search(query: str) -> Optional[Tuple]: Performs a search on Google Maps.
-    - paginate(next_xhr_url: str) -> Optional[Tuple[Response, str]]: Fetches the next page of search results.
-    - crawl(query: str, max_results=20) -> List[Dict]: Crawls Google Maps search results for a given query.
     """
+
     MAP_URL = "https://www.google.com/maps/search/{}"
     ZYTE_ENDPOINT = os.getenv("ZYTE_ENDPOINT")
     ZYTE_API_KEY = os.getenv("ZYTE_API_KEY")
@@ -39,26 +31,31 @@ class Spider():
     def __init__(self, proxy: bool = False):
         """
         Initializes the Spider object.
+
+        Args:
+        - proxy (bool): Flag indicating whether to use a proxy. Default is False.
         """
+
         self.proxy = proxy
         self.xhr_url = []
         self.places_count = 0
 
 
-    def handle_request(self, route):
+    async def handle_request(self, route):
         """
         Handles the intercepted requests during crawling.
 
         Args:
         - route: The intercepted request route.
         """
+
         request = route.request
         if 'search?tbm=map' in request.url:
             self.xhr_url.append(request.url)
-        route.continue_()
+        await route.continue_()
 
 
-    def search(self, query: str) -> Optional[Tuple]:
+    async def search(self, query: str) -> Optional[Tuple]:
         """
         Performs a search on Google Maps.
 
@@ -73,75 +70,87 @@ class Spider():
         url = self.MAP_URL.format(quote_plus(query))
         self.source = url
 
-        with sync_playwright() as p:
-            browser = p.firefox.launch(headless=True).new_context()
-            page = browser.new_page()
-            stealth_sync(page)
+        async with async_playwright() as p:
+            browser = await p.firefox.launch(headless=True)
+            page = await browser.new_page()
+            await stealth_async(page)
 
-            page.route("**/*", self.handle_request)
-            page.goto(url)
-            page.focus, "//h1[text()='Results']/ancestor::div[contains(@aria-label, 'Results for')]"
+            await page.route("**/*", self.handle_request)
+            await page.goto(url)
+            await page.focus("//h1[text()='Results']/ancestor::div[contains(@aria-label, 'Results for')]")
 
             while True:
-                page.wait_for_timeout(2000)
+                await page.wait_for_timeout(2000)
                 last_element = page.locator("//a[contains(@href, '/maps/place')]").last
-                last_element.scroll_into_view_if_needed()
+                await last_element.scroll_into_view_if_needed()
                 if self.xhr_url:
-                    return Response(status=200, url=self.source, text=page.content()), self.xhr_url.pop()
+                    content = await page.content()
+                    return Response(status=200, url=self.source, text=content), self.xhr_url.pop()
                 
         return None, None
 
 
-    def paginate(self, next_xhr_url: str) -> Optional[Tuple[Response, str]]:
+    async def fetch(self, client: AsyncClient, url: str) -> Optional[Response]:
         """
-        Fetches the next page of search results.
+        Fetches the content of a given URL using an HTTP GET request.
+
+        Args:
+            client (AsyncClient): The HTTP client used to make the request.
+            url (str): The URL to fetch.
+
+        Returns:
+            Response: The HTTP response containing the fetched content.
+
+        Raises:
+            HTTPError: If the response status code is not 200.
+        """
+        
+        try:
+            if self.proxy and self.ZYTE_ENDPOINT and self.ZYTE_API_KEY:
+                response = await client.post(
+                    self.ZYTE_ENDPOINT,
+                    auth=(self.ZYTE_API_KEY, ""),
+                    json={
+                        "url": url,
+                        "httpResponseBody": True,
+                        "httpRequestMethod": "GET"
+                    },
+                )
+                http_response_body = b64decode(response.json()["httpResponseBody"]).decode()
+            else:
+
+                response = await client.get(url)
+                http_response_body = response.text
+
+            if response.status_code != 200:
+                raise HTTPError
+            
+        except Exception as e:
+            logger.error(f"Error occurred while fetching: {url}\n {e}")
+            raise e
+        else:
+            if '/*""*/' in http_response_body:
+                json_obj = json.loads(http_response_body.strip('/*""*/'))
+                return Response(status=200, url=self.source, text=json_obj['d'])
+
+
+    def _create_task(self, client: AsyncClient, next_xhr_url: str):
+        """
+        Creates a task for fetching the next page of search results.
 
         Args:
         - next_xhr_url (str): The URL for the next page of search results.
-
-        Returns:
-        - Optional[Tuple[Response, str]]: A tuple containing the response and the URL for the next page of search results.
         """
 
-        try:
-            with Client() as client:
-                if self.proxy and self.ZYTE_ENDPOINT and self.ZYTE_API_KEY:
-                    response = client.post(
-                        self.ZYTE_ENDPOINT,
-                        auth=(self.ZYTE_API_KEY, ""),
-                        json={
-                            "url": next_xhr_url,
-                            "httpResponseBody": True,
-                            "httpRequestMethod": "GET"
-                        },
-                    )
-                    http_response_body = b64decode(response.json()["httpResponseBody"]).decode()
-                else:
-                    response = client.get(next_xhr_url)
-                    http_response_body = response.text
-            if response.status_code != 200:
-                raise HTTPError
-        except Exception as e:
-            logger.error(f"Error occurred while fetching: {next_xhr_url}\n {e}")
-            return None, None
-        
-        if '/*""*/' in http_response_body:
-            json_obj = json.loads(http_response_body.strip('/*""*/'))
+        # 8i20 8i40 8i60
+        next_page_url = next_xhr_url.replace(f"8i20", f"8i{self.places_count}")
+        ech = int(parse_qs(urlparse(next_page_url).query)['ech'][0])
+        next_page_url = next_page_url.replace(f"ech={ech}", f"ech={ech + 1}")
 
-            current_page_value = self.places_count
-            next_page_value = self.places_count + 20
+        return asyncio.create_task(self.fetch(client, next_page_url))
 
-            # 8i20 8i40 8i60
-            next_page_url = json_obj['u'].replace(f"8i{current_page_value}", f"8i{next_page_value}")
-            ech = int(parse_qs(urlparse(next_page_url).query)['ech'][0])
-            next_page_url = next_page_url.replace(f"ech={ech}", f"ech={ech + 1}")
 
-            return Response(status=200, url=self.source, text=json_obj['d']), next_page_url
-        else:
-            return Response(status=404, url=self.source, text=None), None
-        
-
-    def crawl(self, query: str, max_results: int = 20) -> List[Dict]:
+    async def crawl(self, query: str, max_results: int = 20) -> List[Dict]:
         """
         Crawls Google Maps search results for a given query.
 
@@ -152,21 +161,27 @@ class Spider():
         Returns:
         - List[Dict]: A list of dictionaries representing the search results.
         """
-        _output = []
-        response, next_xhr_url = self.search(query)
 
-        while (len(_output) < max_results):
-            places = parse(response)
-            if not places:
-                break
-            _output.extend(places)
-            self.places_count += 20
-            response, next_xhr_url = self.paginate(next_xhr_url)
-            if next_xhr_url is None:
-                break
-            logger.info(f"Total places: {len(_output)}, Page: {round(self.places_count / 20)}")
+        response, next_xhr_url = await self.search(query)
+        places = parse(response)
 
-        return [asdict(place) for place in _output]
+        if places:
+            tasks = []
+            async with AsyncClient() as client:
+                while self.places_count < max_results:
+                    self.places_count += 20
+
+                    task = self._create_task(client, next_xhr_url)
+                    tasks.append(task)
+
+                    logger.info(f"Total places: {self.places_count}, Page: {round(self.places_count / 20)}")
+
+                responses = await asyncio.gather(*tasks, return_exceptions=True)
+                for resp in responses:
+                    if resp and isinstance(resp, Response):
+                        places.extend(parse(resp))
+            
+        return [asdict(place) for place in places]
 
 
 
