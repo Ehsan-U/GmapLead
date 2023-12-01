@@ -11,11 +11,12 @@ from dotenv import load_dotenv
 import os
 from aiolimiter import AsyncLimiter
 from dataclasses import asdict
+import logging
 
 load_dotenv(dotenv_path='../.env')
-from src.models import Response
+from src.utils import Response, get_rating_enum
 from src.logger import logger
-
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 class Spider():
@@ -56,7 +57,7 @@ class Spider():
         await route.continue_()
 
 
-    async def search(self, query: str) -> Optional[Tuple]:
+    async def search(self, query: str, min_rating: float) -> Optional[Tuple]:
         """
         Performs a search on Google Maps.
 
@@ -71,23 +72,39 @@ class Spider():
         url = self.MAP_URL.format(quote_plus(query))
         self.source = url
 
-        async with async_playwright() as p:
-            browser = await p.firefox.launch(headless=True)
-            page = await browser.new_page()
-            await stealth_async(page)
+        try:
+            async with async_playwright() as p:
+                browser = await p.firefox.launch(headless=True)
+                page = await browser.new_page()
+                await stealth_async(page)
 
-            await page.route("**/*", self.handle_request)
-            await page.goto(url)
-            await page.focus("//h1[text()='Results']/ancestor::div[contains(@aria-label, 'Results for')]")
+                await page.route("**/*", self.handle_request)
+                await page.goto(url)
 
-            while True:
-                await page.wait_for_timeout(2000)
-                last_element = page.locator("//a[contains(@href, '/maps/place')]").last
-                await last_element.scroll_into_view_if_needed()
-                if self.xhr_url:
+                idx = get_rating_enum(min_rating)
+                if idx:
+                    await page.wait_for_selector("//button[@aria-label='Rating']")
+                    await page.locator("//button[@aria-label='Rating']").first.click()
+
+                    await page.locator(f"//div[@role='menuitemradio' and @data-index='{idx}']").click()
+                    await page.wait_for_timeout(2000)
+
+                await page.focus("//h1[text()='Results']/ancestor::div[contains(@aria-label, 'Results for')]")
+
+                for _ in range(3):
+                    last_element = page.locator("//a[contains(@href, '/maps/place')]").last
+                    await last_element.scroll_into_view_if_needed()
+                    await page.wait_for_timeout(2000)
                     content = await page.content()
-                    return Response(status=200, url=self.source, text=content), self.xhr_url.pop()
+                    if self.xhr_url:
+                        return Response(status=200, url=self.source, text=content), self.xhr_url.pop()
                 
+                logger.warning("XHR not found")
+                return Response(status=200, url=self.source, text=content), None
+            
+        except Exception as e:
+            logger.error(e)
+        
         return None, None
 
 
@@ -153,7 +170,7 @@ class Spider():
         return asyncio.create_task(self.fetch(client, next_page_url))
 
 
-    async def crawl(self, query: str, max_results: int = 20) -> List[Dict]:
+    async def crawl(self, query: str, max_results: int = 20, min_rating: float = 0) -> List[Dict]:
         """
         Crawls Google Maps search results for a given query.
 
@@ -165,10 +182,10 @@ class Spider():
         - List[Dict]: A list of dictionaries representing the search results.
         """
 
-        response, next_xhr_url = await self.search(query)
+        response, next_xhr_url = await self.search(query, min_rating)
         places = parse(response)
 
-        if places:
+        if places and next_xhr_url:
             tasks = []
             async with AsyncClient() as client:
                 while self.places_count < max_results:
