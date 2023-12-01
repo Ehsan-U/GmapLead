@@ -9,7 +9,7 @@ from src.gmap_parser import parse
 from typing import Dict, List, Optional, Tuple
 from dotenv import load_dotenv
 import os
-import random
+from aiolimiter import AsyncLimiter
 from dataclasses import asdict
 
 load_dotenv(dotenv_path='../.env')
@@ -28,7 +28,7 @@ class Spider():
     ZYTE_API_KEY = os.getenv("ZYTE_API_KEY")
 
 
-    def __init__(self, proxy: bool = False):
+    def __init__(self, proxy: bool = False, rate_limit: int = 100):
         """
         Initializes the Spider object.
 
@@ -39,6 +39,7 @@ class Spider():
         self.proxy = proxy
         self.xhr_url = []
         self.places_count = 0
+        self.rate_limit = AsyncLimiter(max_rate=rate_limit)
 
 
     async def handle_request(self, route):
@@ -106,24 +107,26 @@ class Spider():
         """
         
         try:
-            if self.proxy and self.ZYTE_ENDPOINT and self.ZYTE_API_KEY:
-                response = await client.post(
-                    self.ZYTE_ENDPOINT,
-                    auth=(self.ZYTE_API_KEY, ""),
-                    json={
-                        "url": url,
-                        "httpResponseBody": True,
-                        "httpRequestMethod": "GET"
-                    },
-                )
-                http_response_body = b64decode(response.json()["httpResponseBody"]).decode()
-            else:
+            async with self.rate_limit:
+                if self.proxy and self.ZYTE_ENDPOINT and self.ZYTE_API_KEY:
 
-                response = await client.get(url)
-                http_response_body = response.text
+                    response = await client.post(
+                        self.ZYTE_ENDPOINT,
+                        auth=(self.ZYTE_API_KEY, ""),
+                        json={
+                            "url": url,
+                            "httpResponseBody": True,
+                            "httpRequestMethod": "GET"
+                        },
+                    )
+                    http_response_body = b64decode(response.json()["httpResponseBody"]).decode()
+                else:
 
-            if response.status_code != 200:
-                raise HTTPError
+                    response = await client.get(url)
+                    http_response_body = response.text
+
+                if response.status_code != 200:
+                    raise HTTPError
             
         except Exception as e:
             logger.error(f"Error occurred while fetching: {url}\n {e}")
@@ -134,7 +137,7 @@ class Spider():
                 return Response(status=200, url=self.source, text=json_obj['d'])
 
 
-    def _create_task(self, client: AsyncClient, next_xhr_url: str):
+    def _create_task(self, client: AsyncClient, next_xhr_url: str) -> asyncio.Task:
         """
         Creates a task for fetching the next page of search results.
 
