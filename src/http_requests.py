@@ -91,7 +91,7 @@ class Request(BaseRequest):
         """
 
         try:
-            with httpx.Client(verify=self.verify, timeout=self.TIMEOUT) as client:
+            with httpx.Client(verify=self.verify, timeout=self.TIMEOUT, proxies=self.proxies) as client:
                 response = client.request(
                     url=self.url, 
                     method=self.method, 
@@ -100,7 +100,6 @@ class Request(BaseRequest):
                     params=self.params, 
                     data=self.data, 
                     json=self.json, 
-                    proxies=self.proxies
                 )
                 response.raise_for_status()
                 return response
@@ -153,7 +152,7 @@ class AsyncRequest(BaseRequest):
             Response: The response received from the server.
         """
 
-        async with httpx.AsyncClient(verify=self.verify, timeout=self.TIMEOUT) as client:
+        async with httpx.AsyncClient(verify=self.verify, timeout=self.TIMEOUT, proxies=self.proxies) as client:
             async for attempt in AsyncRetrying(stop=stop_after_attempt(self.RETRIES), wait=wait_exponential(multiplier=1, min=4, max=10), reraise=True):
                 with attempt:
                     async with self.RATE_LIMIT:
@@ -165,7 +164,6 @@ class AsyncRequest(BaseRequest):
                             params=self.params, 
                             data=self.data, 
                             json=self.json, 
-                            proxies=self.proxies
                         )
                         response.raise_for_status()
                         logger.debug(f"Request sent to {self.url}: {response.status_code}")

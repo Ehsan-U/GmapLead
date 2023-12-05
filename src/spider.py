@@ -12,7 +12,7 @@ import httpx
 load_dotenv()
 from src.utils import get_rating_enum
 from src.logger import logger
-from src.http_requests import ZYTE_REQUEST
+from src.http_requests import ZYTE_REQUEST, AsyncRequest
 from src.http_response import ResponseWrapper
 from src.models import MapSelectors
 
