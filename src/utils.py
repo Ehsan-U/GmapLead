@@ -1,45 +1,19 @@
-from dataclasses import dataclass
-from enum import Enum
 from typing import Optional
+from src.models import Rating
 
-
-@dataclass
-class Response:
-    status: int
-    url: str
-    text: str
-
-
-@dataclass
-class Place:
-    place_id: str
-    place_name: str
-    place_desc: str
-    place_reviews: str
-    place_website: str
-    place_owner: str
-    place_main_category: str
-    place_categories: str
-    place_rating: str
-    place_phone: str
-    place_address: str
-    place_detailed_address: str
-    place_timezone: str
-    place_gmap_link: str
-
-
-# this represent page button index
-class Rating(Enum):
-    TWO = 1 
-    TWO_HALF = 2
-    THREE = 3
-    THREE_HALF = 4
-    FOUR = 5
-    FOUR_HALF = 6
-    NULL = None
 
 
 def get_rating_enum(user_rating: float) -> Optional[int]:
+    """
+    Converts a user rating to its corresponding enum value.
+
+    Args:
+        user_rating: The user rating to be converted.
+
+    Returns:
+        The corresponding enum value of the user rating, or None if the rating is not found in the mapping.
+    """
+
     try:
         user_rating = float(user_rating)
         mapping = {
@@ -54,3 +28,24 @@ def get_rating_enum(user_rating: float) -> Optional[int]:
         return mapping.get(user_rating, None)
     except Exception:
         return None
+    
+
+def safe_get(place: dict, *args) -> Optional[str]:
+    """
+    Safely retrieves a value from a nested dictionary.
+
+    Args:
+        place: The dictionary to retrieve the value from.
+        *args: Variable number of keys to access the nested values.
+
+    Returns:
+        The value retrieved from the nested dictionary, or None if any of the keys are not found.
+    """
+
+    for arg in args:
+        try:
+            place = place[arg]
+        except (IndexError, TypeError, KeyError):
+            return None
+        
+    return place
