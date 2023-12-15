@@ -12,12 +12,12 @@ import httpx
 load_dotenv()
 from src.utils import get_rating_enum
 from src.logger import logger
-from src.http_requests import ZYTE_REQUEST, AsyncRequest
+from src.http_requests import ZYTE_REQUEST
 from src.http_response import ResponseWrapper
 from src.models import MapSelectors
 
 
-class Spider():
+class GmapSpider():
     """
     Spider class for crawling and searching Google Maps data.
     """
@@ -32,7 +32,7 @@ class Spider():
         """
         Initialize Spider object.
         """
-        self.xhr_url = []
+        self.captured_xhr = []
         self.places_count = 0
 
 
@@ -42,7 +42,7 @@ class Spider():
         """
         request = route.request
         if 'search?tbm=map' in request.url:
-            self.xhr_url.append(request.url)
+            self.captured_xhr.append(request.url)
         await route.continue_()
 
 
@@ -77,19 +77,15 @@ class Spider():
                     await page.wait_for_timeout(2000)
 
                 await page.focus(MapSelectors.RESULTS.value)
+                xhr_url = None
                 for _ in range(3):
                     last_element = page.locator(MapSelectors.PLACES.value).last
                     await last_element.scroll_into_view_if_needed()
                     await page.wait_for_timeout(2000)
                     content = await page.content()
-                    if self.xhr_url:
-                        return ResponseWrapper(
-                            Response(
-                                status_code=200, 
-                                request=httpx.Client().build_request(url=self.source, method="GET"), 
-                                text=content
-                            )
-                        ), self.xhr_url.pop()
+                    if self.captured_xhr:
+                        xhr_url = self.captured_xhr.pop()
+                        break
                         
                 logger.warning("XHR not found")
                 return ResponseWrapper(
@@ -98,7 +94,7 @@ class Spider():
                         request=httpx.Client().build_request(url=self.source, method="GET"), 
                         text=content
                     )
-                ), None
+                ), xhr_url
             
         except Exception as e:
             logger.error(e)

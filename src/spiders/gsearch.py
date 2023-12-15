@@ -1,0 +1,6 @@
+
+
+
+
+class GsearchSpider:
+    pass
