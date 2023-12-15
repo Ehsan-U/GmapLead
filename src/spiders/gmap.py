@@ -3,16 +3,14 @@ from urllib.parse import quote_plus, urlparse, parse_qs
 from playwright_stealth import stealth_async
 from playwright.async_api import async_playwright
 from typing import Dict, List, Tuple
-from dotenv import load_dotenv
 import os
 from dataclasses import asdict
 from httpx import Response
 import httpx
 
-load_dotenv()
 from src.utils import get_rating_enum
 from src.logger import logger
-from src.http_requests import ZYTE_REQUEST
+from src.http_requests import Zyte_AsyncRequest
 from src.http_response import ResponseWrapper
 from src.models import MapSelectors
 
@@ -116,7 +114,7 @@ class GmapSpider():
         ech = int(parse_qs(urlparse(next_page_url).query)['ech'][0])
         next_page_url = next_page_url.replace(f"ech={ech}", f"ech={ech + 1}")
         
-        request = ZYTE_REQUEST(zyte_api_key=self.ZYTE_API_KEY, url=next_page_url, async_mode=True)
+        request = Zyte_AsyncRequest(zyte_api_key=self.ZYTE_API_KEY, url=next_page_url)
         return asyncio.create_task(request.process_request())
 
 
