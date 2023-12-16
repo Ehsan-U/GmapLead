@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple, AnyStr
 from urllib.parse import urldefrag
 from httpx import Response
 from parsel import Selector
-from collections import namedtuple
+from email_validator import validate_email, EmailNotValidError
 
 from src.models import Place, SocialPatterns
 from src.utils import safe_get
@@ -150,9 +150,20 @@ class ResponseWrapper:
         Returns:
             A mapping of extracted emails.
         """
-        email_regx = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-        return set(re.findall(email_regx, self.response.text))
+        valid_emails = []
 
+        email_regx = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        emails = set(re.findall(email_regx, self.response.text))
+
+        for email in emails:
+            try:
+                emailinfo = validate_email(email, check_deliverability=False)
+                valid_emails.append(emailinfo.normalized)
+            except EmailNotValidError:
+                pass
+        
+        return valid_emails
+    
 
     def extract_social_networks(self) -> Dict:
         """
