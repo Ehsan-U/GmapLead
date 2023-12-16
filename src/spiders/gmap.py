@@ -12,7 +12,7 @@ from src.utils import get_rating_enum
 from src.logger import logger
 from src.http_requests import Zyte_AsyncRequest
 from src.http_response import ResponseWrapper
-from src.models import MapSelectors
+from src.models import MapSelectors, Place
 
 
 class GmapSpider():
@@ -21,7 +21,6 @@ class GmapSpider():
     """
 
     MAP_URL = "https://www.google.com/maps/search/{}"
-    ZYTE_ENDPOINT = os.getenv("ZYTE_ENDPOINT")
     ZYTE_API_KEY = os.getenv("ZYTE_API_KEY")
     PLAYWRIGHT_TIMEOUT = 120*1000
 
@@ -82,10 +81,10 @@ class GmapSpider():
                     await page.wait_for_timeout(2000)
                     content = await page.content()
                     if self.captured_xhr:
+                        logger.info("XHR found")
                         xhr_url = self.captured_xhr.pop()
                         break
                         
-                logger.warning("XHR not found")
                 return ResponseWrapper(
                     Response(
                         status_code=200, 
@@ -118,7 +117,7 @@ class GmapSpider():
         return asyncio.create_task(request.process_request())
 
 
-    async def crawl(self, query: str, max_results: int = 20, min_rating: float = 0) -> List[Dict]:
+    async def crawl(self, query: str, max_results: int = 20, min_rating: float = 0) -> List[Place]:
         """
         Crawl Google Maps data based on the given query, maximum results, and minimum rating.
 
@@ -146,7 +145,7 @@ class GmapSpider():
                 if resp and isinstance(resp, ResponseWrapper):
                     places.extend(resp.places())
             
-        return [asdict(place) for place in places]
+        return places
 
 
 

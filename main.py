@@ -9,7 +9,7 @@ load_dotenv()
 
 # gather business leads from Google Map
 gmap = GmapSpider()
-places = asyncio.run(gmap.crawl("developers in Lahore", max_results=20))
+places = asyncio.run(gmap.crawl("resturants in Canada", max_results=20))
 
 # gather social links from Google Search
 gsearch = GsearchSpider()

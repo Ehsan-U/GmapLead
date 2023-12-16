@@ -1,11 +1,13 @@
 import json
-from typing import Dict, List
+import re
+from typing import Dict, List, Tuple, AnyStr
+from urllib.parse import urldefrag
 from httpx import Response
 from parsel import Selector
+from collections import namedtuple
 
-from src.models import Place
+from src.models import Place, SocialPatterns
 from src.utils import safe_get
-
 
 
 class ResponseWrapper:
@@ -22,7 +24,7 @@ class ResponseWrapper:
         places() -> List[Place]: Parses the response and returns a list of Place objects.
     """
 
-    not_allowed_domains = ["facebook.com", "twitter.com", "linkedin.com", "instagram.com", "tiktok.com", "youtube.com"]
+    NOT_ALLOWED_DOMAINS = ["facebook.com", "twitter.com", "linkedin.com", "instagram.com", "tiktok.com", "youtube.com"]
 
 
     def __init__(self, response: Response):
@@ -98,22 +100,92 @@ class ResponseWrapper:
         for place in data[0][1][1:]:
 
             place_attributes = {
-                'place_id': safe_get(place, -1, 78),
-                'place_name': safe_get(place, -1, 11),
-                'place_desc': safe_get(place, -1, 32, 1, 1),
-                'place_reviews': safe_get(place, -1, 4, 8),
-                'place_website': safe_get(place, -1, 7, 0),
-                'place_owner': safe_get(place, -1, 57, 1),
-                'place_main_category': safe_get(place, -1, 13, 0),
-                'place_categories': safe_get(place, -1, 13),
-                'place_rating': safe_get(place, -1, 4, 7),
-                'place_phone': safe_get(place, -1, 178, 0, 0),
-                'place_address': safe_get(place, -1, 18),
-                'place_detailed_address': self.get_complete_address(place),
-                'place_timezone': safe_get(place, -1, 30),
-                'place_gmap_link': self.url
+                'id': safe_get(place, -1, 78),
+                'name': safe_get(place, -1, 11),
+                'desc': safe_get(place, -1, 32, 1, 1),
+                'reviews': safe_get(place, -1, 4, 8),
+                'website': safe_get(place, -1, 7, 0),
+                'owner': safe_get(place, -1, 57, 1),
+                'main_category': safe_get(place, -1, 13, 0),
+                'categories': safe_get(place, -1, 13),
+                'rating': safe_get(place, -1, 4, 7),
+                'phone': safe_get(place, -1, 178, 0, 0),
+                'address': safe_get(place, -1, 18),
+                'detailed_address': self.get_complete_address(place),
+                'timezone': safe_get(place, -1, 30),
+                'gmap_link': self.url
             }
 
             places.append(Place(**place_attributes))
 
         return places
+
+
+
+    def links(self, size: int = 1) -> List:
+        """
+        Extracts links from the response.
+
+        Args:
+            size: The number of google search results for which links will be returned.
+
+        Returns:
+            A list of extracted links.
+        """
+        values = self.selector.xpath("//div[@id='main']//h3/ancestor::a/@href").getall()
+
+        valid_links = [
+            urldefrag(value).url
+            for value in values
+            if not any(domain in value for domain in self.NOT_ALLOWED_DOMAINS) and '.pdf' not in value
+        ][:size]
+
+        return valid_links
+    
+
+    def extract_emails(self) -> List:
+        """
+        Extracts emails from the response.
+
+        Returns:
+            A mapping of extracted emails.
+        """
+        email_regx = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        return set(re.findall(email_regx, self.response.text))
+
+
+    def extract_social_networks(self) -> Dict:
+        """
+        Extracts social network profiles from the response.
+
+        Returns:
+            A mapping of social network and profile.
+        """
+        social_links = {
+            "facebook": None,
+            "twitter": None,
+            "linkedin": None,
+            "instagram": None,
+            "youtube": None,
+            "pinterest": None,
+        }
+        
+        social_patterns = {
+            "facebook": SocialPatterns.FACEBOOK.value,
+            "twitter": SocialPatterns.TWITTER.value,
+            "linkedin": SocialPatterns.LINKEDIN.value,
+            "instagram": SocialPatterns.INSTAGRAM.value,
+            "youtube": SocialPatterns.YOUTUBE.value,
+            "pinterest": SocialPatterns.PINTEREST.value
+        }
+
+        links = set(self.selector.xpath("//a/@href").getall())
+
+        for link in links:
+            for network, pattern in social_patterns.items():
+                if re.search(pattern, link):
+                    social_links[network] = link
+                    break
+                
+        return social_links
+
