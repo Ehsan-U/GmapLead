@@ -151,7 +151,6 @@ class ResponseWrapper:
             A mapping of extracted emails.
         """
         valid_emails = []
-
         email_regx = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         emails = set(re.findall(email_regx, self.response.text))
 

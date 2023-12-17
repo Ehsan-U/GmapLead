@@ -32,7 +32,12 @@ class BaseRequest:
 
     TIMEOUT: int = 20
     RETRIES: int = 3
-    USER_AGENT: str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+    DEFAULT_HEADERS: dict = {
+        'User-Agent': "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9'
+    }
+
 
     def __init__(
             self, url: str, 
@@ -48,7 +53,7 @@ class BaseRequest:
         ):
         self.url = url
         self.method = method
-        self.headers = headers
+        self.headers = headers or self.DEFAULT_HEADERS
         self.cookies = cookies
         self.params = params
         self.data = data

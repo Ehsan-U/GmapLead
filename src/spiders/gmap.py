@@ -131,6 +131,7 @@ class GmapSpider():
         """
         response, next_xhr_url = await self.search(query, min_rating)
         places = response.places()
+        self.places_count += 20
 
         if places and next_xhr_url:
             tasks = []
