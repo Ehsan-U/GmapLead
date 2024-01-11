@@ -2,15 +2,14 @@ import asyncio
 from urllib.parse import quote_plus, urlparse, parse_qs
 from playwright_stealth import stealth_async
 from playwright.async_api import async_playwright
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 import os
-from dataclasses import asdict
 from httpx import Response
 import httpx
 
 from src.utils import get_rating_enum
 from src.logger import logger
-from src.http_requests import Zyte_AsyncRequest
+from src.http_requests import AsyncRequest
 from src.http_response import ResponseWrapper
 from src.models import MapSelectors, Place
 
@@ -46,13 +45,6 @@ class GmapSpider():
     async def search(self, query: str, min_rating: float) -> Tuple[ResponseWrapper, str]:
         """
         Searches for a query on Google Maps and returns the response.
-
-        Args:
-            query (str): The search query.
-            min_rating (float): The minimum rating for the search results.
-
-        Returns:
-            The response wrapper object containing the search results, or None if an error occurred.
         """
         logger.info(f"Searching: {query}")
 
@@ -102,32 +94,18 @@ class GmapSpider():
     def _create_task(self, next_xhr_url: str) -> asyncio.Task:
         """
         Create an asyncio task for processing the next XHR URL.
-
-        Args:
-            next_xhr_url: The next XHR URL.
-
-        Returns:
-            The created asyncio task.
         """
         next_page_url = next_xhr_url.replace(f"8i20", f"8i{self.places_count}")
         ech = int(parse_qs(urlparse(next_page_url).query)['ech'][0])
         next_page_url = next_page_url.replace(f"ech={ech}", f"ech={ech + 1}")
         
-        request = Zyte_AsyncRequest(zyte_api_key=self.ZYTE_API_KEY, url=next_page_url)
+        request = AsyncRequest(url=next_page_url)
         return asyncio.create_task(request.process_request())
 
 
     async def crawl(self, query: str, max_results: int = 20, min_rating: float = 0) -> List[Place]:
         """
         Crawl Google Maps data based on the given query, maximum results, and minimum rating.
-
-        Args:
-            query: The search query.
-            max_results: The maximum number of results to retrieve.
-            min_rating: The minimum rating for the places.
-
-        Returns:
-            A list of dictionaries representing the crawled places.
         """
         response, next_xhr_url = await self.search(query, min_rating)
         places = response.places()

@@ -12,8 +12,6 @@ from src.logger import logger
 
 
 
-
-
 class BaseRequest:
     """
     Represents a base HTTP request.
@@ -70,16 +68,9 @@ class BaseRequest:
     def handle_failure(self, e: Exception) -> Response:
         """
         Handles a failure during the request.
-
-        Args:
-            e (Exception): The exception that occurred.
-
-        Returns:
-            A response object indicating the failure.
         """
         logger.error(f"All retries failed to {self.url}: {e}", exc_info=True)
         return Response(status_code=420, url=self.url, text=str(e))
-
 
 
 
@@ -96,9 +87,6 @@ class Request(BaseRequest):
     def send(self) -> Response:
         """
         Sends the HTTP request and returns the response.
-
-        Returns:
-            The HTTP response.
         """
 
         with httpx.Client(verify=self.verify, timeout=self.timeout, proxies=self.proxies) as client:
@@ -119,9 +107,6 @@ class Request(BaseRequest):
     def process_request(self) -> Optional[ResponseWrapper]:
         """
         Processes the HTTP request and returns a ResponseWrapper object.
-
-        Returns:
-            The wrapped HTTP response.
         """
 
         try:
@@ -153,9 +138,6 @@ class AsyncRequest(BaseRequest):
     async def send(self) -> Response:
         """
         Sends the HTTP request asynchronously.
-
-        Returns:
-            Response: The response received from the server.
         """
 
         async with httpx.AsyncClient(verify=self.verify, timeout=self.timeout, proxies=self.proxies) as client:
@@ -179,9 +161,6 @@ class AsyncRequest(BaseRequest):
     async def process_request(self) -> Optional[ResponseWrapper]:
         """
         Processes the HTTP request and returns a ResponseWrapper object.
-
-        Returns:
-            The wrapped response object, or None if an exception occurred.
         """
 
         try:
@@ -226,9 +205,6 @@ class Zyte_Request(Request):
     def send(self) -> Response:
         """
         Sends the request synchronously and returns the response.
-
-        Returns:
-            The response object.
         """
 
         json_payload = self.prepare_payload()
@@ -253,9 +229,6 @@ class Zyte_Request(Request):
     def prepare_payload(self) -> dict:
         """
         Prepares the payload for the request.
-
-        Returns:
-            The prepared payload.
         """
 
         if self.browser:
@@ -300,9 +273,6 @@ class Zyte_AsyncRequest(AsyncRequest):
     async def send(self) -> Response:
         """
         Sends the request asynchronously and returns the response.
-
-        Returns:
-            The response object.
         """
 
         json_payload = self.prepare_payload()
@@ -330,9 +300,6 @@ class Zyte_AsyncRequest(AsyncRequest):
     def prepare_payload(self) -> dict:
         """
         Prepares the payload for the request.
-
-        Returns:
-            The prepared payload.
         """
 
         if self.browser:

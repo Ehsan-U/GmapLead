@@ -1,21 +1,17 @@
 from src.spiders.gmap import GmapSpider
-from src.spiders.gsearch import GsearchSpider
 import json
 import asyncio
 from dotenv import load_dotenv
 
 load_dotenv()
 
+import time
+start_time = time.perf_counter()
 
-# gather business leads from Google Map
 gmap = GmapSpider()
-places = asyncio.run(gmap.crawl("Real estate in London", max_results=20))
+places = asyncio.run(gmap.crawl("Real estate in London", max_results=100))
+print(places)
+end_time = time.perf_counter()
+print(f"Time taken: {end_time-start_time}")
 
-# gather social links from Google Search
-gsearch = GsearchSpider()
-leads = asyncio.run(gsearch.crawl(places))
-
-
-with open("data/output/data.json", 'w') as f:
-    json.dump(leads, f)
 

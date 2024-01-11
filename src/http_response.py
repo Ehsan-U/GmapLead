@@ -1,12 +1,9 @@
 import json
-import re
-from typing import Dict, List, Tuple, AnyStr
-from urllib.parse import urldefrag
+from typing import Dict, List
 from httpx import Response
 from parsel import Selector
-from email_validator import validate_email, EmailNotValidError
 
-from src.models import Place, SocialPatterns
+from src.models import Place
 from src.utils import safe_get
 
 
@@ -16,15 +13,11 @@ class ResponseWrapper:
 
     Attributes:
         response (Response): The original HTTP response object.
-        selector (Selector): The selector object for parsing the response text.
-        url (str): The URL of the response.
 
     Methods:
         get_complete_address(place: List) -> Dict: Returns the complete address information for a place.
         places() -> List[Place]: Parses the response and returns a list of Place objects.
     """
-
-    NOT_ALLOWED_DOMAINS = ["facebook.com", "twitter.com", "linkedin.com", "instagram.com", "tiktok.com", "youtube.com"]
 
 
     def __init__(self, response: Response):
@@ -44,13 +37,6 @@ class ResponseWrapper:
     def get_complete_address(self, place: List) -> Dict:
         """
         Returns the complete address information for a place.
-
-        Args:
-            place (List): The place data.
-
-        Returns:
-            Dict: The complete address information.
-
         """
         ward = safe_get(place, -1, 183, 1, 0)
         street = safe_get(place, -1, 183, 1, 1)
@@ -74,10 +60,6 @@ class ResponseWrapper:
     def places(self) -> List[Place]:
         """
         Parses the response and returns a list of Place objects.
-
-        Returns:
-            List[Place]: The list of Place objects.
-
         """
         places = []
         
@@ -119,83 +101,3 @@ class ResponseWrapper:
             places.append(Place(**place_attributes))
 
         return places
-
-
-
-    def links(self, size: int = 1) -> List:
-        """
-        Extracts links from the response.
-
-        Args:
-            size: The number of google search results for which links will be returned.
-
-        Returns:
-            A list of extracted links.
-        """
-        values = self.selector.xpath("//div[@id='main']//h3/ancestor::a/@href").getall()
-
-        valid_links = [
-            urldefrag(value).url
-            for value in values
-            if not any(domain in value for domain in self.NOT_ALLOWED_DOMAINS) and '.pdf' not in value
-        ][:size]
-
-        return valid_links
-    
-
-    def extract_emails(self) -> List:
-        """
-        Extracts emails from the response.
-
-        Returns:
-            A mapping of extracted emails.
-        """
-        valid_emails = []
-        email_regx = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-        emails = set(re.findall(email_regx, self.response.text))
-
-        for email in emails:
-            try:
-                emailinfo = validate_email(email, check_deliverability=False)
-                valid_emails.append(emailinfo.normalized)
-            except EmailNotValidError:
-                pass
-        
-        return valid_emails
-    
-
-    def extract_social_networks(self) -> Dict:
-        """
-        Extracts social network profiles from the response.
-
-        Returns:
-            A mapping of social network and profile.
-        """
-        social_links = {
-            "facebook": None,
-            "twitter": None,
-            "linkedin": None,
-            "instagram": None,
-            "youtube": None,
-            "pinterest": None,
-        }
-        
-        social_patterns = {
-            "facebook": SocialPatterns.FACEBOOK.value,
-            "twitter": SocialPatterns.TWITTER.value,
-            "linkedin": SocialPatterns.LINKEDIN.value,
-            "instagram": SocialPatterns.INSTAGRAM.value,
-            "youtube": SocialPatterns.YOUTUBE.value,
-            "pinterest": SocialPatterns.PINTEREST.value
-        }
-
-        links = set(self.selector.xpath("//a/@href").getall())
-
-        for link in links:
-            for network, pattern in social_patterns.items():
-                if re.search(pattern, link):
-                    social_links[network] = link
-                    break
-                
-        return social_links
-
