@@ -55,7 +55,18 @@ class ResponseWrapper:
         }
 
         return result
+    
 
+    @staticmethod
+    def get_open_hours(place):
+        ls = []
+        elements = safe_get(place, -1, 34, 1) or []
+        for element in elements:
+            day, times = element[0], element[1]
+            time = times[0] if times else None
+            ls.append({'day': day, 'time':  time})
+        return ls
+    
 
     def places(self) -> List[Place]:
         """
@@ -72,19 +83,16 @@ class ResponseWrapper:
         if not text.startswith(")]}'"):
             initialization_state_part = text.split(';window.APP_INITIALIZATION_STATE=')[1]
             app_initialization_state = initialization_state_part.split(';window.APP_FLAGS')[0]
-
             text = json.loads(app_initialization_state)[3][2]
-            
 
         text = text[4:]  # remove )]}' from the start (its present in both cases)
         data = json.loads(text)
 
         for place in data[0][1][1:]:
-
             place_attributes = {
                 'id': safe_get(place, -1, 78),
-                'name': safe_get(place, -1, 11),
-                'desc': safe_get(place, -1, 32, 1, 1),
+                'title': safe_get(place, -1, 11),
+                # 'desc': safe_get(place, -1, 32, 1, 1),
                 'reviews': safe_get(place, -1, 4, 8),
                 'website': safe_get(place, -1, 7, 0),
                 'owner': safe_get(place, -1, 57, 1),
@@ -95,9 +103,10 @@ class ResponseWrapper:
                 'address': safe_get(place, -1, 18),
                 'detailed_address': self.get_complete_address(place),
                 'timezone': safe_get(place, -1, 30),
-                'gmap_link': self.url
+                'status': safe_get(place, -1, 34, 4, 4),
+                'coordinates': {'latitude': safe_get(place, -1, 9, 2), 'longitude': safe_get(place, -1, 9, 3)},
+                "hours": self.get_open_hours(place),
             }
-
             places.append(Place(**place_attributes))
 
         return places

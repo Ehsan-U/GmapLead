@@ -6,8 +6,8 @@ from enum import Enum
 @dataclass
 class Place:
     id: str = None
-    name: str = None
-    desc: str = None
+    title: str = None
+    # desc: str = None
     reviews: str = None
     website: str = None
     owner: str = None
@@ -18,7 +18,9 @@ class Place:
     address: str = None
     detailed_address: str = None
     timezone: str = None
-    gmap_link: str = None
+    status: str = None
+    coordinates: dict = None
+    hours: list = None
 
 
 # this represent page button index

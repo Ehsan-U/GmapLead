@@ -34,5 +34,5 @@ def safe_get(place: dict, *args) -> Optional[str]:
             place = place[arg]
         except (IndexError, TypeError, KeyError):
             return None
-        
+    
     return place

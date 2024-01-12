@@ -1,8 +1,9 @@
 import asyncio
+from dataclasses import asdict
 from urllib.parse import quote_plus, urlparse, parse_qs
 from playwright_stealth import stealth_async
 from playwright.async_api import async_playwright
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 import os
 from httpx import Response
 import httpx
@@ -11,7 +12,7 @@ from src.utils import get_rating_enum
 from src.logger import logger
 from src.http_requests import AsyncRequest
 from src.http_response import ResponseWrapper
-from src.models import MapSelectors, Place
+from src.models import MapSelectors
 
 
 class GmapSpider():
@@ -73,7 +74,7 @@ class GmapSpider():
                     await page.wait_for_timeout(2000)
                     content = await page.content()
                     if self.captured_xhr:
-                        logger.info("XHR found")
+                        logger.debug("XHR found")
                         xhr_url = self.captured_xhr.pop()
                         break
                         
@@ -103,7 +104,7 @@ class GmapSpider():
         return asyncio.create_task(request.process_request())
 
 
-    async def crawl(self, query: str, max_results: int = 20, min_rating: float = 0) -> List[Place]:
+    async def crawl(self, query: str, max_results: int = 20, min_rating: float = 0) -> List[Dict]:
         """
         Crawl Google Maps data based on the given query, maximum results, and minimum rating.
         """
@@ -124,7 +125,7 @@ class GmapSpider():
                 if resp and isinstance(resp, ResponseWrapper):
                     places.extend(resp.places())
             
-        return places
+        return [asdict(place) for place in places] if places else []
 
 
 
