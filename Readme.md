@@ -56,3 +56,5 @@ python -m pip install -r requirements.txt
 ```shell
 python main.py
 ```
+
+Once the scraping process is complete, you can find your leads in the `output` directory.
