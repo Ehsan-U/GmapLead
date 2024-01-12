@@ -31,7 +31,7 @@ Scrape Google Maps using Plain HTTP requests
 
 ### ✨ Features
 
-- Plain HTTP Requests 🚀
+- Faster than any other webdriver based solution 🚀
 - Async (HTTPX) 🚀
 - Efficient JS rendering 🚀
 - Pagination Handling 🚀
