@@ -34,8 +34,10 @@ Scrape Google Maps using Plain HTTP requests 🚀
 - Plain HTTP Requests 🚀
 - Async (HTTPX) 🚀
 - Efficient JS rendering 🚀
+- Pagination Handling
 
 
+---
 
 ## 🚀 Getting Started
 
