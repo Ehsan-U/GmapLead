@@ -27,14 +27,14 @@
 
 ⚡ Get Leads in Seconds! ⚡
 
-Scrape Google Maps using Plain HTTP requests 🚀
+Scrape Google Maps using Plain HTTP requests
 
 ### ✨ Features
 
 - Plain HTTP Requests 🚀
 - Async (HTTPX) 🚀
 - Efficient JS rendering 🚀
-- Pagination Handling
+- Pagination Handling 🚀
 
 
 ---
