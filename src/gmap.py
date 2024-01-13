@@ -45,7 +45,7 @@ class GmapSpider():
 
     async def search(self, query: str, min_rating: float) -> Tuple[ResponseWrapper, str]:
         """
-        Searches for a query on Google Maps and returns the response.
+        Searches for a query on Google Maps and intercept the XHR.
         """
         logger.info(f"Searching: {query}")
 
